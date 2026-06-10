@@ -33,6 +33,30 @@ CREATE POLICY "Users can update own profile" ON public.users
 CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
 
 -- ============================================================================
+-- 1.5 PROFILES TABLE (Store extended user profile details)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id UUID PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
+  username VARCHAR(255) UNIQUE,
+  bio TEXT,
+  website TEXT,
+  github_url TEXT,
+  linkedin_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Enable RLS
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Users view all profiles
+CREATE POLICY "Users view all profiles" ON public.profiles FOR SELECT USING (true);
+
+-- RLS Policy: Users update own profiles
+CREATE POLICY "Users update own profile" ON public.profiles FOR UPDATE USING (id = auth.uid());
+CREATE POLICY "Users insert own profile" ON public.profiles FOR INSERT WITH CHECK (id = auth.uid());
+
+-- ============================================================================
 -- 2. USER ROLES TABLE (Track roles: student, mentor, admin)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.user_roles (
@@ -51,9 +75,9 @@ ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admins view all roles" ON public.user_roles
   FOR SELECT USING (
     EXISTS (
-      SELECT 1 FROM public.user_roles ur2
-      WHERE ur2.user_id = auth.uid()
-        AND ur2.role IN ('admin', 'mentor')
+      SELECT 1 FROM public.users
+      WHERE id = auth.uid()
+        AND role IN ('admin', 'mentor')
     )
   );
 
@@ -102,6 +126,92 @@ CREATE POLICY "Mentors view assigned submissions" ON public.project_submissions
 CREATE INDEX IF NOT EXISTS idx_project_submissions_user_id ON public.project_submissions(user_id);
 CREATE INDEX IF NOT EXISTS idx_project_submissions_status ON public.project_submissions(status);
 CREATE INDEX IF NOT EXISTS idx_project_submissions_created_at ON public.project_submissions(created_at DESC);
+
+-- ============================================================================
+-- 3.5 MILESTONES TABLE (Project deliverables)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.milestones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  submission_id UUID NOT NULL REFERENCES public.project_submissions(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'in-progress', 'completed', 'blocked')),
+  due_date TIMESTAMP WITH TIME ZONE,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Enable RLS
+ALTER TABLE public.milestones ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Users view milestones for their submissions
+CREATE POLICY "Users view own milestones" ON public.milestones
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.project_submissions
+      WHERE id = milestones.submission_id AND user_id = auth.uid()
+    )
+  );
+
+-- RLS Policy: Mentors view all milestones
+CREATE POLICY "Mentors view all milestones" ON public.milestones
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.user_roles
+      WHERE user_id = auth.uid() AND role IN ('mentor', 'admin')
+    )
+  );
+
+-- Create indexes
+CREATE INDEX IF NOT EXISTS idx_milestones_submission_id ON public.milestones(submission_id);
+
+-- ============================================================================
+-- 3.8 HELP REQUESTS TABLE (Student support requests)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.help_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  submission_id UUID NOT NULL REFERENCES public.project_submissions(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  description TEXT NOT NULL,
+  status VARCHAR(50) DEFAULT 'open' CHECK (status IN ('open', 'in-progress', 'resolved', 'closed')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Enable RLS
+ALTER TABLE public.help_requests ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Users view own help requests
+CREATE POLICY "Users view own help requests" ON public.help_requests
+  FOR SELECT USING (student_id = auth.uid());
+
+CREATE POLICY "Users insert own help requests" ON public.help_requests
+  FOR INSERT WITH CHECK (student_id = auth.uid());
+
+-- RLS Policy: Mentors view all help requests
+CREATE POLICY "Mentors view all help requests" ON public.help_requests
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.user_roles
+      WHERE user_id = auth.uid() AND role IN ('mentor', 'admin')
+    )
+  );
+  
+-- RLS Policy: Mentors update all help requests
+CREATE POLICY "Mentors update all help requests" ON public.help_requests
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM public.user_roles
+      WHERE user_id = auth.uid() AND role IN ('mentor', 'admin')
+    )
+  );
+
+-- Create indexes
+CREATE INDEX IF NOT EXISTS idx_help_requests_student_id ON public.help_requests(student_id);
+CREATE INDEX IF NOT EXISTS idx_help_requests_submission_id ON public.help_requests(submission_id);
+CREATE INDEX IF NOT EXISTS idx_help_requests_status ON public.help_requests(status);
 
 -- ============================================================================
 -- 4. CONVERSATIONS TABLE (Chat sessions between student and BODHIT)
@@ -352,6 +462,10 @@ CREATE TRIGGER mentor_reports_updated_at BEFORE UPDATE ON public.mentor_reports
 
 -- Create trigger for progress_entries
 CREATE TRIGGER progress_entries_updated_at BEFORE UPDATE ON public.progress_entries
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+-- Create trigger for milestones
+CREATE TRIGGER milestones_updated_at BEFORE UPDATE ON public.milestones
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- ============================================================================

@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --config ./vite.config.cjs",
     "otp-server": "tsx src/backend/server.ts",
     "build": "vite build",
     "build:dev": "vite build --mode development",

@@ -54,7 +54,7 @@ interface Submission {
   project_description: string;
   status: string;
   deadline: string;
-  tech_stack: string[];
+  tech_stack: string | string[];
   skill_score: number;
   full_name: string;
   email: string;
@@ -117,12 +117,12 @@ const MentorDashboard = () => {
   const [isMentor, setIsMentor] = useState(false);
   const [selectedSubmission, setSelectedSubmission] = useState<string | null>(null);
   const [expandedMilestones, setExpandedMilestones] = useState<Set<string>>(new Set());
-  
+
   // Edit states
   const [editingMilestone, setEditingMilestone] = useState<string | null>(null);
   const [editedTitle, setEditedTitle] = useState("");
   const [editedDescription, setEditedDescription] = useState("");
-  
+
   // Feedback dialog
   const [feedbackDialog, setFeedbackDialog] = useState(false);
   const [feedbackSubmission, setFeedbackSubmission] = useState<string | null>(null);
@@ -157,13 +157,13 @@ const MentorDashboard = () => {
 
   const checkMentorRole = async () => {
     if (!user) return;
-    
+
     const { data, error } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
       .in("role", ["mentor", "admin"]);
-    
+
     if (error) {
       console.error("Error checking role:", error);
       toast({
@@ -203,7 +203,7 @@ const MentorDashboard = () => {
       // Fetch all milestones with tasks
       if (submissionsData && submissionsData.length > 0) {
         const submissionIds = submissionsData.map((s) => s.id);
-        
+
         const { data: milestonesData, error: milestonesError } = await supabase
           .from("milestones")
           .select("*")
@@ -214,7 +214,7 @@ const MentorDashboard = () => {
 
         if (milestonesData && milestonesData.length > 0) {
           const milestoneIds = milestonesData.map((m) => m.id);
-          
+
           const { data: tasksData, error: tasksError } = await supabase
             .from("tasks")
             .select("*")
@@ -269,7 +269,7 @@ const MentorDashboard = () => {
         .eq("id", id);
 
       if (error) throw error;
-      
+
       toast({ title: "Success", description: `Project ${status}.` });
       fetchMentorData();
     } catch (error) {
@@ -290,7 +290,7 @@ const MentorDashboard = () => {
         .eq("id", id);
 
       if (error) throw error;
-      
+
       toast({ title: "Success", description: "Milestone updated." });
       setEditingMilestone(null);
       fetchMentorData();
@@ -330,7 +330,7 @@ const MentorDashboard = () => {
 
   const submitFeedback = async () => {
     if (!feedbackSubmission || !feedbackText.trim()) return;
-    
+
     setSubmittingFeedback(true);
     try {
       const { error } = await supabase.from("mentor_reviews").insert({
@@ -342,7 +342,7 @@ const MentorDashboard = () => {
       });
 
       if (error) throw error;
-      
+
       toast({ title: "Success", description: "Feedback submitted." });
       setFeedbackDialog(false);
       setFeedbackText("");
@@ -378,8 +378,8 @@ const MentorDashboard = () => {
     try {
       // Get max order_index for this submission
       const existingMilestones = milestones[newMilestoneSubmissionId] || [];
-      const maxOrder = existingMilestones.length > 0 
-        ? Math.max(...existingMilestones.map((m) => m.order_index)) 
+      const maxOrder = existingMilestones.length > 0
+        ? Math.max(...existingMilestones.map((m) => m.order_index))
         : -1;
 
       const { error } = await supabase.from("milestones").insert({
@@ -496,7 +496,13 @@ const MentorDashboard = () => {
   }
 
   if (!isMentor) {
-    return null;
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">Checking access...</p>
+        </div>
+      </div>
+    );
   }
 
   const pendingSubmissions = submissions.filter((s) => s.status === "pending");
@@ -583,7 +589,7 @@ const MentorDashboard = () => {
                 <FileText className="w-5 h-5 text-primary" />
                 Pending Submissions
               </h2>
-              
+
               {pendingSubmissions.length === 0 ? (
                 <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground">
                   <CheckCircle2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -604,11 +610,16 @@ const MentorDashboard = () => {
                           <Badge variant="outline">Score: {sub.skill_score}/15</Badge>
                         </div>
                       </div>
-                      
+
                       <p className="text-sm text-muted-foreground mb-4 line-clamp-3">{sub.project_description}</p>
-                      
+
                       <div className="flex flex-wrap gap-2 mb-4">
-                        {sub.tech_stack.map((tech) => (
+                        {(Array.isArray(sub.tech_stack)
+                          ? sub.tech_stack
+                          : typeof sub.tech_stack === 'string'
+                            ? sub.tech_stack.split(',').map(s => s.trim()).filter(Boolean)
+                            : []
+                        ).map((tech) => (
                           <Badge key={tech} variant="outline" className="text-xs">{tech}</Badge>
                         ))}
                       </div>

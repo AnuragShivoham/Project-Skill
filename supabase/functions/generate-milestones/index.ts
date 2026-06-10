@@ -251,7 +251,22 @@ serve(async (req) => {
     const mode = aiRoadmap ? "ai" : "fallback";
     console.log(`Generated roadmap in ${mode} mode with ${roadmap.milestones.length} milestones`);
 
-    const deadlineDate = new Date(submission.deadline);
+    // Handle deadline - parse it properly
+    let deadlineDate: Date;
+    if (!submission.deadline) {
+      // Default to 30 days from now if no deadline
+      deadlineDate = new Date();
+      deadlineDate.setDate(deadlineDate.getDate() + 30);
+    } else {
+      // Parse the deadline - it might be in YYYY-MM-DD format
+      deadlineDate = new Date(submission.deadline + "T00:00:00");
+      // If invalid, default to 30 days
+      if (isNaN(deadlineDate.getTime())) {
+        deadlineDate = new Date();
+        deadlineDate.setDate(deadlineDate.getDate() + 30);
+      }
+    }
+
     const now = new Date();
     const totalDays = Math.max(1, Math.floor((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
     const daysPerMilestone = Math.max(1, Math.floor(totalDays / roadmap.milestones.length));
@@ -262,6 +277,11 @@ serve(async (req) => {
       const dueDate = new Date(now);
       dueDate.setDate(dueDate.getDate() + daysPerMilestone * (milestone.order_index + 1));
 
+      // Format date as YYYY-MM-DD explicitly
+      const dueDateStr = dueDate.getFullYear() + "-" + 
+        String(dueDate.getMonth() + 1).padStart(2, "0") + "-" + 
+        String(dueDate.getDate()).padStart(2, "0");
+
       const { data: createdMilestone, error: milestoneError } = await supabase
         .from("milestones")
         .insert({
@@ -269,7 +289,7 @@ serve(async (req) => {
           title: milestone.title,
           description: milestone.description,
           order_index: milestone.order_index,
-          due_date: dueDate.toISOString().split("T")[0],
+          due_date: dueDateStr,
           source: "ai",
           status: "pending",
         })

@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { ChevronRight, ChevronDown, File, Folder, FolderOpen, Trash2, CheckSquare, Square } from "lucide-react";
+import { ChevronRight, ChevronDown, File, Folder, FolderOpen, Trash2, CheckSquare, Square, Home } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useFileSystem } from "@/hooks/useFileSystem";
+import { useProjectFiles } from "@/hooks/useProjectFiles";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 
@@ -107,8 +108,9 @@ const TreeNode = ({
 };
 
 const FileExplorer = ({ onFileSelect, selectedFile }: FileExplorerProps) => {
-  const fs = useFileSystem();
+  const fs = useProjectFiles();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const tree = fs.getFileTree();
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
 
@@ -135,9 +137,9 @@ const FileExplorer = ({ onFileSelect, selectedFile }: FileExplorerProps) => {
         const node = fs.files[path];
         if (!node) continue;
         if (node.type === "folder") {
-          fs.deleteFile(path, true);
+          fs.deleteNode(path, true);
         } else {
-          fs.deleteFile(path);
+          fs.deleteNode(path);
         }
         deleted += 1;
       } catch {
@@ -167,9 +169,20 @@ const FileExplorer = ({ onFileSelect, selectedFile }: FileExplorerProps) => {
 
   return (
     <div className="h-full bg-ide-sidebar border-r border-border">
-      <div className="p-3 border-b border-border flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Explorer</h3>
-        <div className="flex items-center gap-2">
+      <div className="p-3 border-b border-border flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Explorer</h3>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0"
+            onClick={() => navigate("/dashboard")}
+            title="Return to Dashboard"
+          >
+            <Home className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+          </Button>
+        </div>
+        <div className="flex items-center gap-2 mt-1">
           <Button
             size="sm"
             variant="outline"

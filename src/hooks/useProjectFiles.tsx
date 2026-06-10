@@ -2,15 +2,14 @@ import React, { createContext, useContext, useState, useCallback, ReactNode, use
 import { fileSystem, FileNode } from "@/services/IDEFileSystem";
 import { gitHubService } from "@/services/GitHubService";
 
-interface FileSystemContextType {
+interface ProjectFilesContextType {
   files: Record<string, FileNode>;
   selectedFile: string | null;
   selectFile: (path: string) => void;
-  createFile: (path: string, content?: string, language?: string) => FileNode;
-  createFolder: (path: string) => FileNode;
-  updateFile: (path: string, content: string) => FileNode;
-  deleteFile: (path: string, recursive?: boolean) => Record<string, FileNode> | void;
-  renameFile: (oldPath: string, newName: string) => FileNode;
+  createNode: (path: string, type: "file" | "folder", content?: string, language?: string) => FileNode;
+  updateNode: (path: string, content: string) => FileNode;
+  deleteNode: (path: string, recursive?: boolean) => Record<string, FileNode> | void;
+  renameNode: (oldPath: string, newName: string) => FileNode;
   undoDelete: () => void;
   listDirectory: (path: string) => FileNode[];
   exportProject: () => string;
@@ -18,12 +17,14 @@ interface FileSystemContextType {
   resetProject: () => void;
   getStats: () => { totalFiles: number; totalFolders: number; totalSize: number };
   getFileTree: () => FileNode[];
+  importFiles: (filesMap: Record<string, string>) => void;
   cloneGitHubRepo: (url: string) => Promise<void>;
+  getFileSummary: (path: string) => string;
 }
 
-const FileSystemContext = createContext<FileSystemContextType | undefined>(undefined);
+const ProjectFilesContext = createContext<ProjectFilesContextType | undefined>(undefined);
 
-export const FileSystemProvider = ({ children }: { children: ReactNode }) => {
+export const ProjectFilesProvider = ({ children }: { children: ReactNode }) => {
   const [files, setFiles] = useState<Record<string, FileNode>>(fileSystem.getAllFiles());
   const [selectedFile, setSelectedFile] = useState<string | null>("/src/components/Auth.tsx");
   const [lastDeleted, setLastDeleted] = useState<Record<string, FileNode> | null>(null);
@@ -32,29 +33,25 @@ export const FileSystemProvider = ({ children }: { children: ReactNode }) => {
     setSelectedFile(path);
   }, []);
 
-  const createFile = useCallback((path: string, content = "", language = "text") => {
-    const file = fileSystem.createFile(path, content, language);
+  const createNode = useCallback((path: string, type: "file" | "folder", content = "", language = "text") => {
+    const node = type === "file"
+      ? fileSystem.createFile(path, content, language)
+      : fileSystem.createFolder(path);
     setFiles(fileSystem.getAllFiles());
-    return file;
+    return node;
   }, []);
 
-  const createFolder = useCallback((path: string) => {
-    const folder = fileSystem.createFolder(path);
-    setFiles(fileSystem.getAllFiles());
-    return folder;
-  }, []);
-
-  const updateFile = useCallback((path: string, content: string) => {
+  const updateNode = useCallback((path: string, content: string) => {
     const file = fileSystem.updateFile(path, content);
     setFiles(fileSystem.getAllFiles());
     return file;
   }, []);
 
-  const deleteFile = useCallback((path: string, recursive = false) => {
+  const deleteNode = useCallback((path: string, recursive = false) => {
     try {
       const deleted = fileSystem.delete(path, recursive);
       setFiles(fileSystem.getAllFiles());
-      if (selectedFile === path) {
+      if (selectedFile === path || selectedFile?.startsWith(path + "/")) {
         setSelectedFile(null);
       }
       if (deleted) {
@@ -73,7 +70,7 @@ export const FileSystemProvider = ({ children }: { children: ReactNode }) => {
     setLastDeleted(null);
   }, [lastDeleted]);
 
-  const renameFile = useCallback((oldPath: string, newName: string) => {
+  const renameNode = useCallback((oldPath: string, newName: string) => {
     const file = fileSystem.rename(oldPath, newName);
     setFiles(fileSystem.getAllFiles());
     if (selectedFile === oldPath) {
@@ -109,6 +106,21 @@ export const FileSystemProvider = ({ children }: { children: ReactNode }) => {
     return fileSystem.getFileTree();
   }, []);
 
+  const importFiles = useCallback((filesMap: Record<string, string>) => {
+    for (const [path, content] of Object.entries(filesMap)) {
+      try {
+        if (!fileSystem.getFile(path)) {
+          fileSystem.createFile(path, content);
+        } else {
+          fileSystem.updateFile(path, content);
+        }
+      } catch (err) {
+        console.warn(`Failed to import file ${path}`, err);
+      }
+    }
+    setFiles(fileSystem.getAllFiles());
+  }, []);
+
   const cloneGitHubRepo = useCallback(async (url: string) => {
     const parsed = gitHubService.parseGitHubUrl(url);
     if (!parsed) {
@@ -128,15 +140,22 @@ export const FileSystemProvider = ({ children }: { children: ReactNode }) => {
     setFiles(fileSystem.getAllFiles());
   }, []);
 
-  const contextValue: FileSystemContextType = {
+  const getFileSummary = useCallback((path: string) => {
+    const file = fileSystem.getFile(path);
+    if (!file) return "File not found.";
+    if (file.type === "folder") return `Directory with ${file.children?.length || 0} items.`;
+    const lines = file.content?.split("\n").length || 0;
+    return `${file.name} (${file.language || "text"}) - ${lines} lines, ${file.content?.length || 0} bytes.`;
+  }, []);
+
+  const contextValue: ProjectFilesContextType = {
     files,
     selectedFile,
     selectFile,
-    createFile,
-    createFolder,
-    updateFile,
-    deleteFile,
-    renameFile,
+    createNode,
+    updateNode,
+    deleteNode,
+    renameNode,
     undoDelete,
     listDirectory,
     exportProject,
@@ -144,20 +163,22 @@ export const FileSystemProvider = ({ children }: { children: ReactNode }) => {
     resetProject,
     getStats,
     getFileTree,
+    importFiles,
     cloneGitHubRepo,
+    getFileSummary,
   };
 
   return (
-    <FileSystemContext.Provider value={contextValue}>
+    <ProjectFilesContext.Provider value={contextValue}>
       {children}
-    </FileSystemContext.Provider>
+    </ProjectFilesContext.Provider>
   );
 };
 
-export const useFileSystem = () => {
-  const context = useContext(FileSystemContext);
+export const useProjectFiles = () => {
+  const context = useContext(ProjectFilesContext);
   if (!context) {
-    throw new Error("useFileSystem must be used within FileSystemProvider");
+    throw new Error("useProjectFiles must be used within ProjectFilesProvider");
   }
   return context;
 };

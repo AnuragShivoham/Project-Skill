@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Terminal as TerminalIcon, Minimize2, Maximize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useFileSystem } from "@/hooks/useFileSystem";
+import { useProjectFiles } from "@/hooks/useProjectFiles";
 
 interface TerminalLine {
   type: "input" | "output" | "error" | "success" | "info";
@@ -15,7 +15,7 @@ interface TerminalProps {
 }
 
 const Terminal = ({ isExpanded, onToggle }: TerminalProps) => {
-  const fs = useFileSystem();
+  const fs = useProjectFiles();
   const [cwd, setCwd] = useState("/src");
   const [lines, setLines] = useState<TerminalLine[]>([
     { type: "info", content: "AMIT-BODHIT Terminal v2.0", timestamp: new Date() },
@@ -138,7 +138,7 @@ const Terminal = ({ isExpanded, onToggle }: TerminalProps) => {
             addLine("error", "Usage: touch <file>");
             break;
           }
-          fs.createFile(target, "", "text");
+          fs.createNode(target, "file", "", "text");
           addLine("success", `Created file: ${target}`);
           break;
         }
@@ -148,7 +148,7 @@ const Terminal = ({ isExpanded, onToggle }: TerminalProps) => {
             addLine("error", "Usage: mkdir <folder>");
             break;
           }
-          fs.createFolder(target);
+          fs.createNode(target, "folder");
           addLine("success", `Created folder: ${target}`);
           break;
         }
@@ -159,7 +159,7 @@ const Terminal = ({ isExpanded, onToggle }: TerminalProps) => {
             addLine("error", "Usage: rm <path> | rm -r <folder>");
             break;
           }
-          fs.deleteFile(target, recursive);
+          fs.deleteNode(target, recursive);
           addLine("success", `Deleted: ${target}`);
           break;
         }
@@ -170,7 +170,7 @@ const Terminal = ({ isExpanded, onToggle }: TerminalProps) => {
           }
           const from = resolvePath(args[0]);
           const toName = args[1];
-          fs.renameFile(from, toName);
+          fs.renameNode(from, toName);
           addLine("success", `Renamed: ${from} -> ${toName}`);
           break;
         }

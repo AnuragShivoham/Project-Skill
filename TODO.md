@@ -1,63 +1,52 @@
-# Project-Skill IDE Completion TODO
+# TODO: Improve IDE UI to be more like VS Code
 
-## Phase 1: Authentication Fixes
-- [ ] Fix sign up for new students, mentors, admin roles
-- [ ] Ensure role assignment works correctly on sign up
-- [ ] Handle email confirmation if needed
+## Current State
+The IDE already has:
+- Monaco Editor (VS Code's editor) ✓
+- File Explorer with tree view ✓
+- File Operations Panel ✓
+- Terminal ✓
+- AI Chat Panel ✓
+- Floating AI Chat in student dashboard ✓
 
-## Phase 2: useProjectFiles Hook
-- [ ] Rename useFileSystem to useProjectFiles
-- [ ] Add importFiles method for local folder upload
-- [ ] Add cloneGitHubRepo method with GitHub API integration
-- [ ] Add getFileSummary method
-- [ ] Update method names to match plan (createNode, deleteNode, etc.)
-- [ ] Add lazy loading for large GitHub repos
-- [ ] Namespace GitHub clones under /repos/<repo-name>/
+## Improvements Needed
 
-## Phase 3: File Operations
-- [ ] Implement local file/folder import with drag-drop or file input
-- [ ] Add JSZip for ZIP export functionality
-- [ ] Update export to create actual ZIP files
-- [ ] Add file-saver for downloads
+### 1. Activity Bar (Far Left)
+Add a vertical bar on the far left with icons:
+- Explorer (files)
+- Search
+- Source Control (Git)
+- Extensions
+- Settings
 
-## Phase 4: GitHub Integration
-- [ ] Create GitHub API service module
-- [ ] Implement repo URL parsing
-- [ ] Fetch default branch and recursive tree
-- [ ] Fetch file contents with rate limiting
-- [ ] Handle large repos and binary files
-- [ ] Add clone button to File Explorer
+### 2. Tabs for Open Files
+Add tabs above the code editor to show open files, similar to VS Code
 
-## Phase 5: Terminal Enhancements
-- [ ] Implement real command execution (not simulated)
-- [ ] Add [EXECUTE] tag parsing in AI chat
-- [ ] Enable AI-triggered terminal commands
-- [ ] Add command history persistence
-- [ ] Improve visual output formatting
+### 3. Breadcrumbs
+Add breadcrumbs above the editor showing the file path
 
-## Phase 6: Persistence Options
-- [ ] Add Supabase database storage option
-- [ ] Allow switching between localStorage and DB
-- [ ] Sync files across sessions/devices
+### 4. Status Bar
+Add a status bar at the bottom showing:
+- Current branch (if any)
+- Line/column number
+- Language mode
+- Encoding
 
-## Phase 7: UI Enhancements
-- [ ] Add context menu to File Explorer (rename, duplicate, etc.)
-- [ ] Improve file operations panel with import/clone buttons
-- [ ] Add loading states and error boundaries
+### 5. File Upload from Local Storage
+Add ability to upload files from local computer (in addition to JSON import)
 
-## Phase 8: Dependencies & Build
-- [ ] Add JSZip, file-saver, octokit (GitHub API) to package.json
-- [ ] Update imports and types
-- [ ] Ensure TypeScript compilation
+## Implementation Plan
+1. Update IDEWorkspace.tsx to add activity bar
+2. Add tabs component for open files
+3. Add breadcrumbs component
+4. Add status bar component
+5. Add file upload feature to FileOperationsPanel
+6. Test all features
 
-## Phase 9: Production & Security
-- [ ] Add Vercel deployment config
-- [ ] Environment variable handling
-- [ ] Security audit and improvements
-- [ ] Performance optimizations
-
-## Phase 10: Testing & Validation
-- [ ] Test all new features
-- [ ] Verify AI integration works
-- [ ] Check cross-browser compatibility
-- [ ] Validate production build
+## Files to Modify
+- src/components/ide/IDEWorkspace.tsx - Main IDE layout
+- src/components/ide/CodeEditor.tsx - Add breadcrumbs
+- src/components/ide/FileOperationsPanel.tsx - Add file upload
+- src/components/ide/ActivityBar.tsx - New component
+- src/components/ide/FileTabs.tsx - New component
+- src/components/ide/StatusBar.tsx - New component

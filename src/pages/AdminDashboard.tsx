@@ -244,7 +244,13 @@ const AdminDashboard = () => {
   }
 
   if (!isAdmin) {
-    return null;
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">Checking access...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useFileSystem } from "@/hooks/useFileSystem";
+ import { useState, useRef } from "react";
+import { useProjectFiles } from "@/hooks/useProjectFiles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,12 +12,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Download, Upload, RefreshCw, FileText, Folder, Trash2, Edit2, Plus, Github } from "lucide-react";
+import { Download, Upload, RefreshCw, FileText, Folder, Trash2, Edit2, Plus, Github, Upload as UploadIcon, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useProgress } from '@/hooks/useProgress';
 
 const FileOperationsPanel = () => {
-  const fileSystem = useFileSystem();
+  const fileSystem = useProjectFiles();
   const { toast } = useToast();
   const [showCreateFile, setShowCreateFile] = useState(false);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
@@ -29,6 +29,8 @@ const FileOperationsPanel = () => {
   const [importData, setImportData] = useState("");
   const [gitHubUrl, setGitHubUrl] = useState("");
   const [isCloning, setIsCloning] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const stats = fileSystem.getStats();
   const { saveProgress } = useProgress();
 
@@ -38,7 +40,7 @@ const FileOperationsPanel = () => {
       return;
     }
     try {
-      fileSystem.createFile(newPath, newContent, "typescript");
+      fileSystem.createNode(newPath, "file", newContent, "typescript");
       toast({ title: "Success", description: `File created: ${newPath}` });
       setNewPath("");
       setNewContent("");
@@ -54,7 +56,7 @@ const FileOperationsPanel = () => {
       return;
     }
     try {
-      fileSystem.createFolder(newPath);
+      fileSystem.createNode(newPath, "folder");
       toast({ title: "Success", description: `Folder created: ${newPath}` });
       setNewPath("");
       setShowCreateFolder(false);
@@ -115,8 +117,53 @@ const FileOperationsPanel = () => {
     }
   };
 
+  // Handle local file upload
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    try {
+      const filesMap: Record<string, string> = {};
+      
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const content = await file.text();
+        // Use the file's name as the path
+        const path = `/${file.name}`;
+        filesMap[path] = content;
+      }
+
+      fileSystem.importFiles(filesMap);
+      toast({ title: "Success", description: `Uploaded ${files.length} file(s)` });
+      
+      // Reset the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (err) {
+      toast({ title: "Error", description: String(err), variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const triggerFileUpload = () => {
+    fileInputRef.current?.click();
+  };
+
   return (
     <div className="p-4 border-t border-border space-y-4">
+      {/* Hidden file input for local uploads */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        multiple
+        accept=".ts,.tsx,.js,.jsx,.json,.md,.css,.html,.txt"
+        className="hidden"
+      />
+
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-semibold text-sm">Project Stats</h3>
@@ -162,7 +209,21 @@ const FileOperationsPanel = () => {
           className="gap-2"
         >
           <Upload className="w-4 h-4" />
-          Import
+          Import JSON
+        </Button>
+        <Button
+          onClick={triggerFileUpload}
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          disabled={isUploading}
+        >
+          {isUploading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <UploadIcon className="w-4 h-4" />
+          )}
+          Upload Files
         </Button>
         <Button
           onClick={async () => {
@@ -175,7 +236,7 @@ const FileOperationsPanel = () => {
           }}
           variant="outline"
           size="sm"
-          className="gap-2"
+          className="gap-2 col-span-2"
         >
           Save Progress
         </Button>

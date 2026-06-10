@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { useFileSystem } from "@/hooks/useFileSystem";
+import { useProjectFiles } from "@/hooks/useProjectFiles";
 import { useProgress } from "@/hooks/useProgress";
 import { useConversationHistory } from "@/hooks/useConversationHistory";
 
@@ -49,21 +49,9 @@ const AIChatPanel = ({
     {
       id: "1",
       role: "assistant",
-      content: `You are interacting with BODHIT — the Project-Skill Chatbot. My role: teach, guide, and evaluate your project work; I will NOT write code for you.
-
-Before I create milestones or give guidance, provide all of these inputs (I will NOT proceed until confirmed):
-- Project idea (one-line description)
-- Tech stack / language (primary)
-- Skill level (beginner / intermediate / advanced)
-- Timeline (weeks or target date)
-
-Please provide the four fields in one message in this format:
-Project idea: ...
-Tech stack: ...
-Skill level: ...
-Timeline: ...
-
-After you provide and confirm these, I will propose a numbered sequence of milestones. I will not produce runnable code — I will only explain concepts, ask guiding questions, and produce verifiable milestone plans.`,
+      content: submissionId
+        ? `You are interacting with BODHIT — the Project-Skill Chatbot. I see you have an active project submission! My role: teach, guide, and evaluate your project work; I will NOT write code for you.\n\nTell me which milestone you'd like to start with, or ask me for a project structure audit.`
+        : `You are interacting with BODHIT — the Project-Skill Chatbot. My role: teach, guide, and evaluate your project work; I will NOT write code for you.\n\nBefore I create milestones or give guidance, provide all of these inputs (I will NOT proceed until confirmed):\n- Project idea (one-line description)\n- Tech stack / language (primary)\n- Skill level (beginner / intermediate / advanced)\n- Timeline (weeks or target date)\n\nPlease provide the four fields in one message in this format:\nProject idea: ...\nTech stack: ...\nSkill level: ...\nTimeline: ...\n\nAfter you provide and confirm these, I will propose a numbered sequence of milestones. I will not produce runnable code — I will only explain concepts, ask guiding questions, and produce verifiable milestone plans.`,
       type: "explanation",
     },
   ]);
@@ -74,7 +62,7 @@ After you provide and confirm these, I will propose a numbered sequence of miles
     skillLevel: string;
     timeline: string;
   } | null>(null);
-  const [intakeConfirmed, setIntakeConfirmed] = useState(false);
+  const [intakeConfirmed, setIntakeConfirmed] = useState(!!submissionId);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [allowFileAccess, setAllowFileAccess] = useState(false);
@@ -86,11 +74,11 @@ After you provide and confirm these, I will propose a numbered sequence of miles
   const [showMilestoneOpsDialog, setShowMilestoneOpsDialog] = useState(false);
   const [opsLog, setOpsLog] = useState<any[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  let fs: ReturnType<typeof useFileSystem> | null = null;
+  let fs: ReturnType<typeof useProjectFiles> | null = null;
   try {
-    // useFileSystem requires provider; if not present, we'll fall back to props
+    // useProjectFiles requires provider; if not present, we'll fall back to props
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    fs = useFileSystem();
+    fs = useProjectFiles();
   } catch (e) {
     fs = null;
   }
@@ -135,12 +123,12 @@ After you provide and confirm these, I will propose a numbered sequence of miles
       const projectFilesList = Object.keys(currentFiles || {});
       const projectStructurePayload = currentFiles
         ? JSON.stringify(
-            Object.values(currentFiles).map((f: any) => ({
-              path: f.path,
-              type: f.type,
-              language: f.language,
-            }))
-          )
+          Object.values(currentFiles).map((f: any) => ({
+            path: f.path,
+            type: f.type,
+            language: f.language,
+          }))
+        )
         : undefined;
       const projectFilesContentPayload = allowFileAccess
         ? fs
@@ -158,16 +146,16 @@ After you provide and confirm these, I will propose a numbered sequence of miles
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-            messages: allMessages.map((m) => ({ role: m.role, content: m.content })),
-            currentTask,
-            currentCode,
-            // Provide file list always; include full file contents only when user allows it
-            projectFiles: projectFilesList,
-            projectStructure: projectStructurePayload,
-            projectFilesContent: projectFilesContentPayload,
-            progressEntries: progressEntriesPayload,
-            studentDashboardContext: dashboardContextPayload,
-          }),
+          messages: allMessages.map((m) => ({ role: m.role, content: m.content })),
+          currentTask,
+          currentCode,
+          // Provide file list always; include full file contents only when user allows it
+          projectFiles: projectFilesList,
+          projectStructure: projectStructurePayload,
+          projectFilesContent: projectFilesContentPayload,
+          progressEntries: progressEntriesPayload,
+          studentDashboardContext: dashboardContextPayload,
+        }),
       });
 
       if (!resp.ok) {
@@ -352,28 +340,28 @@ After you provide and confirm these, I will propose a numbered sequence of miles
             const path = op.path;
             const content = op.content || "";
             const language = op.language || "text";
-            if (fs) fs.createFile(path, content, language);
+            if (fs) fs.createNode(path, "file", content, language);
             applied.push({ ...op, status: "ok" });
             break;
           }
           case "update": {
             const path = op.path;
             const content = op.content || "";
-            if (fs) fs.updateFile(path, content);
+            if (fs) fs.updateNode(path, content);
             applied.push({ ...op, status: "ok" });
             break;
           }
           case "delete": {
             const path = op.path;
             const recursive = !!op.recursive;
-            if (fs) fs.deleteFile(path, recursive);
+            if (fs) fs.deleteNode(path, recursive);
             applied.push({ ...op, status: "ok" });
             break;
           }
           case "rename": {
             const oldPath = op.path;
             const newName = op.newName || op.newPath;
-            if (fs) fs.renameFile(oldPath, newName);
+            if (fs) fs.renameNode(oldPath, newName);
             applied.push({ ...op, status: "ok" });
             break;
           }

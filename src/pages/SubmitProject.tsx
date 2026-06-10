@@ -161,19 +161,21 @@ const SubmitProject = () => {
     try {
       // Get current user if logged in
       const { data: { user } } = await supabase.auth.getUser();
-      
+      if (!user) throw new Error("User must be logged in to submit a project");
+
       const { error } = await supabase.from("project_submissions").insert({
-        full_name: personalData.fullName,
-        email: personalData.email,
-        college: personalData.college,
-        year_of_study: personalData.yearOfStudy,
         project_title: projectData.projectTitle,
         project_description: projectData.projectDescription,
         tech_stack: projectData.techStack,
         deadline: format(projectData.deadline, "yyyy-MM-dd"),
+        status: "pending",
+        full_name: personalData.fullName,
+        email: personalData.email,
+        college: personalData.college,
+        year_of_study: personalData.yearOfStudy,
         skill_assessment: quizAnswers,
         skill_score: score,
-        user_id: user?.id || null,
+        user_id: user.id,
       });
 
       if (error) throw error;
@@ -225,8 +227,8 @@ const SubmitProject = () => {
                       step === s
                         ? "bg-primary text-primary-foreground"
                         : ["personal", "project", "quiz"].indexOf(step) > i
-                        ? "bg-primary/20 text-primary"
-                        : "bg-muted text-muted-foreground"
+                          ? "bg-primary/20 text-primary"
+                          : "bg-muted text-muted-foreground"
                     )}
                   >
                     {i + 1}
