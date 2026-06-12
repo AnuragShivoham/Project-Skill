@@ -36,7 +36,7 @@ const personalInfoSchema = z.object({
 
 const projectInfoSchema = z.object({
   projectTitle: z.string().min(5, "Title must be at least 5 characters").max(150),
-  projectDescription: z.string().min(50, "Description must be at least 50 characters").max(2000),
+  projectDescription: z.string().min(50, "Description must be at least 50 characters").max(5000),
   techStack: z.array(z.string()).min(1, "Select at least one technology"),
   deadline: z.date({ required_error: "Deadline is required" }),
 });
@@ -161,9 +161,8 @@ const SubmitProject = () => {
     try {
       // Get current user if logged in
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("User must be logged in to submit a project");
-
-      const { error } = await supabase.from("project_submissions").insert({
+      
+      const submissionData = {
         project_title: projectData.projectTitle,
         project_description: projectData.projectDescription,
         tech_stack: projectData.techStack,
@@ -175,10 +174,40 @@ const SubmitProject = () => {
         year_of_study: personalData.yearOfStudy,
         skill_assessment: quizAnswers,
         skill_score: score,
-        user_id: user.id,
-      });
+        user_id: user?.id || null, // Allow null for anonymous submissions
+      };
 
-      if (error) throw error;
+      const { data: submission, error: subError } = await supabase
+        .from("project_submissions")
+        .insert(submissionData)
+        .select()
+        .single();
+
+      if (subError) {
+        console.error("Supabase insert error:", subError);
+        throw subError;
+      }
+
+      // If anonymous, store in localStorage so they can claim it after signup
+      if (!user && submission) {
+        localStorage.setItem("BODHIT_PENDING_SUBMISSION", submission.id);
+        localStorage.setItem("BODHIT_GUEST_EMAIL", personalData.email);
+      }
+
+      // Automated Feedback logic (Initial Mentor Assessment)
+      const feedback = score >= 12 
+        ? "Excellent assessment score! Your technical foundation is strong. I've approved your project idea and fast-tracked your roadmap generation. Let's start with high-level architecture." 
+        : score >= 8 
+        ? "Good foundation. Your assessment shows some areas for growth in architecture, but you're ready to start. I'll be looking closely at your data modeling in the first few milestones." 
+        : "Welcome to the platform! Based on your assessment, we'll start with fundamental concepts and project setup. Take your time with the first two milestones to build a solid base.";
+
+      await supabase.from("mentor_reviews").insert({
+        submission_id: submission.id,
+        reviewer_id: user?.id || "00000000-0000-0000-0000-000000000000", // Use system UUID placeholder for anonymous
+        feedback: feedback,
+        status: "approved",
+        review_type: "initial_assessment",
+      });
 
       setStep("success");
     } catch (error) {
@@ -532,9 +561,15 @@ const SubmitProject = () => {
                 <CheckCircle2 className="w-8 h-8 text-success" />
               </div>
               <h2 className="text-2xl font-bold mb-4">Application Submitted!</h2>
+              <div className="mb-6 p-4 bg-primary/5 rounded-lg border border-primary/10 inline-block">
+                <span className="text-sm font-mono text-muted-foreground mr-2">ASSESSMENT SCORE:</span>
+                <span className="text-xl font-bold text-primary">{calculateScore()}/15</span>
+              </div>
               <p className="text-muted-foreground max-w-md mx-auto mb-8">
-                We've received your project submission. Our team will review your application
-                and skill assessment. You'll hear from us within 48 hours.
+                {calculateScore() >= 10 
+                  ? "Impressive score! Your solid fundamentals will allow us to fast-track your roadmap to more advanced features."
+                  : "Good start! We'll tailor your roadmap to ensure you master the core fundamentals while building your project."}
+                Our team will complete the final review within 48 hours.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button variant="outline" onClick={() => navigate("/")}>

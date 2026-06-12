@@ -191,10 +191,11 @@ const MentorDashboard = () => {
 
   const fetchMentorData = async () => {
     try {
-      // Fetch all submissions
+      // Fetch all submissions that have mentor access enabled
       const { data: submissionsData, error: submissionsError } = await supabase
         .from("project_submissions")
         .select("*")
+        .eq("mentor_access", true)
         .order("created_at", { ascending: false });
 
       if (submissionsError) throw submissionsError;

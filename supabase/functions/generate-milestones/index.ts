@@ -9,8 +9,8 @@ const corsHeaders = {
 const SYSTEM_PROMPT = `You are a project planning expert for the AMIT-BODHIT co-building platform. Your task is to analyze a student's project and create a structured learning roadmap with milestones and tasks.
 
 GUIDELINES:
-1. Create 4-6 milestones that build progressively
-2. Each milestone should have 3-5 concrete tasks
+1. Create a dynamic number of milestones (typically 4-8) based on project complexity
+2. Each milestone should have 3-6 concrete tasks
 3. Tasks should be specific, actionable, and educational
 4. Consider the student's skill score when determining complexity
 5. Align milestones with the project deadline
@@ -19,9 +19,9 @@ GUIDELINES:
 
 MILESTONE STRUCTURE:
 - Start with project setup and foundation
-- Progress through core features
-- Include testing and documentation
-- End with deployment and polish
+- Progress through core features and integrations
+- Include testing, security, and documentation
+- End with deployment and final polish
 
 TASK GUIDELINES:
 - Each task should take 1-4 hours
@@ -56,52 +56,42 @@ function buildFallbackRoadmap(submission: any): Roadmap {
     milestones: [
       {
         order_index: 0,
-        title: "Project Setup and Foundations",
+        title: "Project Setup & Foundations",
         description: `Set up repository, environment, and coding standards for ${title}. Skill level: ${level}.`,
         tasks: [
           { order_index: 0, title: "Initialize repository and structure", description: "Create base folders and README with scope and assumptions." },
           { order_index: 1, title: "Configure development environment", description: `Set up tooling for ${tech} and verify local run/build flow.` },
-          { order_index: 2, title: "Define implementation checklist", description: "Break project into features with acceptance criteria and priorities." },
+          { order_index: 2, title: "Define implementation roadmap", description: "Confirm features, priorities, and learning goals." },
         ],
       },
       {
         order_index: 1,
-        title: "Core Data and Backend Logic",
-        description: "Implement data model, validation, and core backend behavior.",
+        title: "Core Architecture & Data",
+        description: "Implement data model, schema validation, and core platform behavior.",
         tasks: [
-          { order_index: 0, title: "Design entities and relationships", description: "Document key entities and data flow for the main features." },
-          { order_index: 1, title: "Implement CRUD/service layer", description: "Build core create/read/update/delete paths with validation." },
-          { order_index: 2, title: "Add error handling and edge-case checks", description: "Handle invalid input, missing data, and retries where needed." },
+          { order_index: 0, title: "Design data entities and relations", description: "Document key entities and data flow for main features." },
+          { order_index: 1, title: "Build core service/API layer", description: "Implement foundation create/read/update/delete operations." },
+          { order_index: 2, title: "Add data validation & error handling", description: "Protect core logic from invalid inputs and edge cases." },
         ],
       },
       {
         order_index: 2,
-        title: "Feature Implementation",
+        title: "Primary Feature Development",
         description: "Build and integrate primary user-facing features.",
         tasks: [
-          { order_index: 0, title: "Implement primary user flow", description: "Deliver the end-to-end flow for the most important use case." },
-          { order_index: 1, title: "Integrate frontend and backend", description: "Connect UI actions to backend endpoints/data operations." },
-          { order_index: 2, title: "Handle auth/permissions paths", description: "Ensure correct behavior for allowed and disallowed operations." },
+          { order_index: 0, title: "Develop main user-flow", description: "Deliver the end-to-end flow for the most important use case." },
+          { order_index: 1, title: "Frontend-Backend Integration", description: "Wire up UI components to the underlying logic/services." },
+          { order_index: 2, title: "Security and Permission implementation", description: "Restrict access and protect user data." },
         ],
       },
       {
         order_index: 3,
-        title: "Testing and Quality",
-        description: "Improve reliability and maintainability before release.",
+        title: "Testing, Optimization & Deployment",
+        description: "Prepare the project for submission and final delivery.",
         tasks: [
-          { order_index: 0, title: "Write functional test cases", description: "Cover happy path and failure path scenarios." },
-          { order_index: 1, title: "Add validation checks in UI/UX", description: "Surface clear errors and loading states for all major actions." },
-          { order_index: 2, title: "Refactor high-risk sections", description: "Simplify complex logic and remove duplication." },
-        ],
-      },
-      {
-        order_index: 4,
-        title: "Deployment and Documentation",
-        description: "Prepare project for submission and future maintenance.",
-        tasks: [
-          { order_index: 0, title: "Prepare deployment configuration", description: "Finalize runtime config, env docs, and deployment steps." },
-          { order_index: 1, title: "Create user and technical documentation", description: "Add setup guide, architecture notes, and troubleshooting." },
-          { order_index: 2, title: "Final review and demo checklist", description: "Validate acceptance criteria and capture demo-ready scenarios." },
+          { order_index: 0, title: "Complete system testing", description: "Verify all features work together as expected." },
+          { order_index: 1, title: "Performance polish and bug fixes", description: "Optimize bottlenecks and resolve high-priority visual/logic issues." },
+          { order_index: 2, title: "Final deployment and documentation", description: "Publish project and provide setup/usage guides." },
         ],
       },
     ],

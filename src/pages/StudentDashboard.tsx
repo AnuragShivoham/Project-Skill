@@ -53,6 +53,7 @@ interface Submission {
   deadline: string;
   tech_stack: string | string[];
   skill_score: number;
+  mentor_access: boolean;
   created_at: string;
 }
 
@@ -183,10 +184,42 @@ const StudentDashboard = () => {
   const [submittingHelp, setSubmittingHelp] = useState(false);
   // Mentor report UI
   const [profileRole, setProfileRole] = useState<string | null>(null);
+  const [userPlan, setUserPlan] = useState<string>("free");
   const [mentorDialogOpen, setMentorDialogOpen] = useState(false);
   const [mentorReports, setMentorReports] = useState<Array<Record<string, unknown>>>([]);
   const [loadingMentorReports, setLoadingMentorReports] = useState(false);
 
+  const toggleMentorAccess = async () => {
+    if (!currentSubmission) return;
+    
+    try {
+      const newAccess = !currentSubmission.mentor_access;
+      const { error } = await supabase
+        .from("project_submissions")
+        .update({ mentor_access: newAccess })
+        .eq("id", currentSubmission.id);
+
+      if (error) throw error;
+
+      setSubmissions(prev => prev.map(s => 
+        s.id === currentSubmission.id ? { ...s, mentor_access: newAccess } : s
+      ));
+      
+      toast({
+        title: newAccess ? "Project Shared" : "Access Revoked",
+        description: newAccess 
+          ? "Industry mentors can now view and review your project." 
+          : "Mentors can no longer access this project.",
+      });
+    } catch (err) {
+      console.error("Error toggling access:", err);
+      toast({
+        title: "Update Failed",
+        description: "Could not update mentor access settings.",
+        variant: "destructive",
+      });
+    }
+  };
   useEffect(() => {
     if (!loading && !user) {
       navigate("/auth");
@@ -196,17 +229,20 @@ const StudentDashboard = () => {
   useEffect(() => {
     if (user) {
       fetchDashboardData();
-      // fetch profile role for mentor UI
+      // fetch profile role and plan
       (async () => {
         try {
           const { data, error } = await supabase
-            .from("user_roles")
-            .select("role")
+            .from("profiles")
+            .select("role, plan")
             .eq("user_id", user.id)
             .maybeSingle();
-          if (!error && data) setProfileRole(data.role || null);
+          if (!error && data) {
+            setProfileRole(data.role || null);
+            setUserPlan(data.plan || "free");
+          }
         } catch (err) {
-          console.warn("Failed to fetch profile role:", err);
+          console.warn("Failed to fetch profile info:", err);
         }
       })();
     }
@@ -513,8 +549,22 @@ const StudentDashboard = () => {
                   {/* Project Overview */}
                   <section className="bg-card border border-border rounded-xl p-6">
                     <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
-                      <div>
-                        <h1 className="text-2xl font-bold mb-2">{currentSubmission.project_title}</h1>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h1 className="text-2xl font-bold">{currentSubmission.project_title}</h1>
+                          <Button 
+                            variant={currentSubmission.mentor_access ? "default" : "outline"}
+                            size="sm"
+                            className={cn(
+                              "h-7 text-[10px] gap-1",
+                              currentSubmission.mentor_access ? "bg-success/20 text-success hover:bg-success/30 border-success/30" : ""
+                            )}
+                            onClick={toggleMentorAccess}
+                          >
+                            <User className="w-3 h-3" />
+                            {currentSubmission.mentor_access ? "Shared with Mentor" : "Share with Mentor"}
+                          </Button>
+                        </div>
                         <p className="text-muted-foreground line-clamp-2">
                           {currentSubmission.project_description}
                         </p>
@@ -532,8 +582,14 @@ const StudentDashboard = () => {
                         </div>
                       </div>
                       <div className="bg-secondary/50 rounded-lg p-4">
-                        <div className="text-sm text-muted-foreground mb-1">Skill Score</div>
-                        <div className="font-semibold">{currentSubmission.skill_score}/15</div>
+                        <div className="text-sm text-muted-foreground mb-1">Assessment</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">{currentSubmission.skill_score}/15</span>
+                          <Badge variant="outline" className="text-[10px] py-0 h-4">
+                            {currentSubmission.skill_score >= 12 ? "Advanced" : 
+                             currentSubmission.skill_score >= 8 ? "Intermediate" : "Beginner"}
+                          </Badge>
+                        </div>
                       </div>
                       <div className="bg-secondary/50 rounded-lg p-4">
                         <div className="text-sm text-muted-foreground mb-1">Time Spent</div>
@@ -728,7 +784,21 @@ const StudentDashboard = () => {
                 Mentor Reviews
               </h2>
 
-              {reviews.length === 0 && chatbotReports.length === 0 ? (
+              {userPlan === "free" ? (
+                <div className="bg-card border border-border rounded-xl p-12 text-center">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
+                    <Sparkles className="w-8 h-8 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">Mentor Reviews is a Pro Feature</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto mb-8">
+                    Get direct feedback from industry mentors on your code. Subscribed users get detailed reviews 
+                    and checkpoints to ensure project quality.
+                  </p>
+                  <Button className="bg-gradient-to-r from-primary to-accent hover:opacity-90">
+                    Upgrade to Pro Plan
+                  </Button>
+                </div>
+              ) : reviews.length === 0 && chatbotReports.length === 0 ? (
                 <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground">
                   <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
                   <p>No reviews yet. Complete milestones to receive feedback.</p>
@@ -777,13 +847,29 @@ const StudentDashboard = () => {
                   <HelpCircle className="w-5 h-5 text-primary" />
                   Help Requests
                 </h2>
-                <Button onClick={() => setHelpDialog(true)} disabled={!currentSubmission}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Request
-                </Button>
+                {userPlan !== "free" && (
+                  <Button onClick={() => setHelpDialog(true)} disabled={!currentSubmission}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Request
+                  </Button>
+                )}
               </div>
 
-              {helpRequests.length === 0 ? (
+              {userPlan === "free" ? (
+                <div className="bg-card border border-border rounded-xl p-12 text-center">
+                  <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-6">
+                    <HelpCircle className="w-8 h-8 text-accent" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">Priority Support is a Pro Feature</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto mb-8">
+                    Stuck on a tricky bug? Pro users can request help directly from our mentor team 
+                    and get response within 4 hours.
+                  </p>
+                  <Button variant="outline" className="border-accent text-accent hover:bg-accent/10">
+                    See Pro Features
+                  </Button>
+                </div>
+              ) : helpRequests.length === 0 ? (
                 <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground">
                   <HelpCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
                   <p>No help requests yet. Need assistance? Create a request!</p>

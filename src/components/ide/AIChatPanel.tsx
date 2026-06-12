@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useProjectFiles } from "@/hooks/useProjectFiles";
 import { useProgress } from "@/hooks/useProgress";
 import { useConversationHistory } from "@/hooks/useConversationHistory";
+import { LearningBiteCard, getLearningBiteForTask } from "./ContextualLearning";
 
 interface Message {
   id: string;
@@ -36,6 +37,7 @@ const AIChatPanel = ({
   showHeader = false,
   dashboardContext,
 }: AIChatPanelProps) => {
+  const currentLearningBite = getLearningBiteForTask(currentTask);
   const { toast } = useToast();
   const {
     currentConversation,
@@ -628,6 +630,12 @@ const AIChatPanel = ({
               <p className="text-xs text-muted-foreground">Powered by AI • Never writes code</p>
             </div>
           </div>
+        </div>
+      )}
+
+      {currentLearningBite && (
+        <div className="px-4 pt-4">
+          <LearningBiteCard bite={currentLearningBite} />
         </div>
       )}
 

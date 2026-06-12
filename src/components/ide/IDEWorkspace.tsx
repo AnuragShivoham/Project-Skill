@@ -1,4 +1,4 @@
-  import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import FileExplorer from "./FileExplorer";
 import CodeEditor from "./CodeEditor";
@@ -11,21 +11,43 @@ import StatusBar from "./StatusBar";
 import Breadcrumbs from "./Breadcrumbs";
 import { useProjectFiles, ProjectFilesProvider } from "@/hooks/useProjectFiles";
 import { ConversationHistory } from "@/components/ConversationHistory";
+import { GitBranch, Github, Search as SearchIcon, FileCode } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { CodeExplanationModal } from "./CodeExplanationModal";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import ExtensionsPanel from "./ExtensionsPanel";
 
 const IDEWorkspaceContent = () => {
+  const { toast } = useToast();
+  const { user } = useAuth();
   const { files, selectedFile, selectFile, updateNode, deleteNode } = useProjectFiles();
   const [isTerminalExpanded, setIsTerminalExpanded] = useState(true);
   const [activeView, setActiveView] = useState("explorer");
   const [openFiles, setOpenFiles] = useState<string[]>([]);
+  const [isVerificationOpen, setIsVerificationOpen] = useState(false);
+  const [userPlan, setUserPlan] = useState<string>("free");
+  
   const currentFileNode = selectedFile ? files[selectedFile] : null;
   const code = currentFileNode?.content || "";
 
-  // Add file to open files when selected
   useEffect(() => {
-    if (selectedFile && !openFiles.includes(selectedFile)) {
-      setOpenFiles(prev => [...prev, selectedFile]);
+    if (user) {
+      const fetchProfile = async () => {
+        const { data } = await supabase
+          .from("profiles")
+          .select("plan")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (data) setUserPlan(data.plan || "free");
+      };
+      fetchProfile();
     }
-  }, [selectedFile]);
+  }, [user]);
 
   const handleCodeChange = (value: string | undefined) => {
     if (value !== undefined && selectedFile) {
@@ -33,26 +55,25 @@ const IDEWorkspaceContent = () => {
     }
   };
 
-  const handleFileClose = (path: string) => {
-    setOpenFiles(prev => prev.filter(f => f !== path));
-    if (selectedFile === path) {
-      // Select another open file or deselect
-      const remaining = openFiles.filter(f => f !== path);
-      if (remaining.length > 0) {
-        selectFile(remaining[remaining.length - 1]);
-      }
-    }
+  const handleVerificationSuccess = () => {
+    toast({
+      title: "Proof of Work Verified",
+      description: userPlan === "pro" 
+        ? "AI verification passed. Your code is also being queued for Mentor review."
+        : "You have successfully explained your code via AI assessment.",
+    });
   };
 
-  const getLanguage = (path: string): string => {
-    if (!path) return "TypeScript";
-    if (path.endsWith(".ts") || path.endsWith(".tsx")) return "TypeScript";
-    if (path.endsWith(".js") || path.endsWith(".jsx")) return "JavaScript";
-    if (path.endsWith(".json")) return "JSON";
-    if (path.endsWith(".md")) return "Markdown";
-    if (path.endsWith(".css")) return "CSS";
-    if (path.endsWith(".html")) return "HTML";
-    return "TypeScript";
+  const handleVerificationFailure = () => {
+    toast({
+      title: "Verification Failed",
+      description: "Code explanation was incorrect. Task has been flagged for reset.",
+      variant: "destructive",
+    });
+  };
+
+  const handleSubmitClick = () => {
+    setIsVerificationOpen(true);
   };
 
   return (
@@ -71,11 +92,77 @@ const IDEWorkspaceContent = () => {
 
           <ResizableHandle withHandle />
 
-          {/* File Explorer */}
+          {/* Sidebar Panels (Explorer, Search, Git, Extensions) */}
           <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
-            <div className="flex flex-col h-full">
-              <FileExplorer onFileSelect={selectFile} selectedFile={selectedFile} />
-              <FileOperationsPanel />
+            <div className="flex flex-col h-full bg-ide-sidebar border-r border-border">
+              {activeView === "explorer" && (
+                <>
+                  <FileExplorer onFileSelect={selectFile} selectedFile={selectedFile} />
+                  <FileOperationsPanel />
+                </>
+              )}
+              {activeView === "search" && (
+                <div className="flex flex-col h-full">
+                  <div className="p-4 border-b border-border">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
+                       <SearchIcon className="w-4 h-4" />
+                       Search Project
+                    </h3>
+                    <div className="relative">
+                      <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search files..."
+                        className="pl-9 h-9 text-xs bg-muted/30"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-muted-foreground">
+                    <SearchIcon className="w-8 h-8 mb-2 opacity-20" />
+                    <p className="text-xs">Enter a search term to find code across your project</p>
+                  </div>
+                </div>
+              )}
+              {activeView === "git" && (
+                <div className="flex flex-col h-full overflow-y-auto">
+                  <div className="p-4 border-b border-border">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <GitBranch className="w-4 h-4" />
+                      Source Control
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="p-3 bg-muted/30 rounded border border-border">
+                        <p className="text-[10px] text-muted-foreground mb-1 uppercase">Current Repository</p>
+                        <div className="text-xs font-mono truncate text-primary flex items-center gap-2">
+                           <Github className="w-3 h-3" />
+                           AnuragShivoham/Project-Skill
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label className="text-[10px] uppercase text-muted-foreground">Changes</Label>
+                        <div className="space-y-1">
+                          {Object.keys(files).slice(0, 3).map(path => (
+                            <div key={path} className="flex items-center justify-between p-1.5 rounded hover:bg-muted/50 text-[11px]">
+                               <div className="flex items-center gap-2 truncate">
+                                 <FileCode className="w-3 h-3 text-primary" />
+                                 <span className="truncate">{path}</span>
+                               </div>
+                               <span className="text-[10px] text-yellow-500 font-bold ml-2">M</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="pt-2">
+                         <Button size="sm" className="w-full gap-2 text-xs h-8">
+                            Commit & Sync
+                         </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {activeView === "extensions" && <ExtensionsPanel />}
             </div>
           </ResizablePanel>
 
@@ -84,18 +171,15 @@ const IDEWorkspaceContent = () => {
           {/* Editor + Terminal */}
           <ResizablePanel defaultSize={55}>
             <div className="h-full flex flex-col">
-              {/* File Tabs */}
               <FileTabs 
                 openFiles={openFiles} 
                 activeFile={selectedFile} 
                 onFileSelect={selectFile}
-                onFileClose={handleFileClose}
+                onFileClose={(path) => setOpenFiles(prev => prev.filter(f => f !== path))}
               />
               
-              {/* Breadcrumbs */}
               <Breadcrumbs path={selectedFile || ""} />
 
-              {/* Editor */}
               <div className="flex-1 min-h-0">
                 <CodeEditor
                   selectedFile={selectedFile}
@@ -104,7 +188,6 @@ const IDEWorkspaceContent = () => {
                 />
               </div>
               
-              {/* Terminal */}
               <Terminal
                 isExpanded={isTerminalExpanded}
                 onToggle={() => setIsTerminalExpanded((v) => !v)}
@@ -127,8 +210,18 @@ const IDEWorkspaceContent = () => {
 
       {/* Status Bar */}
       <StatusBar 
-        language={selectedFile ? getLanguage(selectedFile) : "TypeScript"}
+        language={selectedFile ? "TypeScript" : "Plain Text"}
         branch="main"
+        userPlan={userPlan}
+        onSubmitClick={handleSubmitClick}
+      />
+
+      <CodeExplanationModal
+        isOpen={isVerificationOpen}
+        onClose={() => setIsVerificationOpen(false)}
+        onSuccess={handleVerificationSuccess}
+        onFailure={handleVerificationFailure}
+        codeSnippet={code.slice(0, 500)} // Pass first 500 chars for context
       />
     </div>
   );

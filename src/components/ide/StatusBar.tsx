@@ -8,6 +8,8 @@ interface StatusBarProps {
   branch?: string;
   hasErrors?: boolean;
   hasWarnings?: boolean;
+  userPlan?: string;
+  onSubmitClick?: () => void;
 }
 
 const StatusBar = ({ 
@@ -16,7 +18,9 @@ const StatusBar = ({
   column = 1, 
   branch = "main",
   hasErrors = false,
-  hasWarnings = false 
+  hasWarnings = false,
+  userPlan = "free",
+  onSubmitClick
 }: StatusBarProps) => {
   return (
     <div className="h-6 bg-[#007acc] text-white flex items-center justify-between px-3 text-xs">
@@ -39,6 +43,17 @@ const StatusBar = ({
           )}
           <span>{hasErrors ? "0" : hasWarnings ? "0" : "0"} problems</span>
         </div>
+
+        {/* Submit Button */}
+        {onSubmitClick && (
+          <button 
+            onClick={onSubmitClick}
+            className="flex items-center gap-1.5 bg-accent/20 hover:bg-accent/40 px-3 py-0.5 rounded transition-colors text-accent-foreground border border-accent/30 font-bold ml-4"
+          >
+            <CheckCircle className="w-3.5 h-3.5" />
+            <span>SUBMIT FOR REVIEW</span>
+          </button>
+        )}
       </div>
 
       {/* Right section */}
